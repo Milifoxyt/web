@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>milifo</title>
+<meta name="description" content="一个把阅读当作坐标的人">
+<meta name="theme-color" content="#0b0908">
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/blog.css">
+<script>document.documentElement.classList.add('js');</script>
+</head>
+<body data-page="index">
+<a class="skip" href="#main">跳到正文</a>
+
+<header class="topbar" id="top">
+  <a class="brand" href="index.html">milifo<span aria-hidden="true">.</span></a>
+  <nav class="nav" aria-label="主导航">
+        <a href="works.html">作品</a>
+        <a href="index.html#about">关于</a>
+        <a href="index.html#places">阅读地点</a>
+        <a href="works.html?kind=community">社区投稿</a>
+        <a href="index.html#contact">联系</a>
+  </nav>
+  <div class="topbar__account">
+        <a class="topbar__link" href="login.html">登录</a>
+        <a class="topbar__cta" href="register.html">注册</a>
+  </div>
+</header>
+
+<main id="main">
+
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="hero__glow" aria-hidden="true"></div>
+    <div class="hero__inner">
+      <p class="eyebrow reveal">个人站点 — 2026</p>
+      <h1 class="hero__name reveal" id="hero-title">milifo</h1>
+      <p class="hero__lead reveal">读书，写字，记下我在哪座城市、哪张桌子上，读完了一本书。</p>
+      <ul class="hero__meta reveal">
+        <li><span class="pulse" aria-hidden="true"></span>现在在上海</li>
+        <li><time id="clock" datetime="">--:--</time> 本地时间</li>
+        <li>在读《城市与狗》</li>
+      </ul>
+
+      <aside class="hero__recent" aria-label="最近更新">
+        <p class="label">最近更新 / RECENT</p>
+        <ol class="recent__list" data-recent></ol>
+      </aside>
+    </div>
+    <a class="scroll" href="#works"><span>向下</span><span class="scroll__arrow" aria-hidden="true">↓</span></a>
+  </section>
+
+  <section class="stats" aria-label="一些数字">
+    <ul class="stats__list">
+      <li class="reveal"><span class="stats__num">12</span><span class="stats__label">去过的城市</span></li><li class="reveal"><span class="stats__num">47</span><span class="stats__label">今年读完的书</span></li><li class="reveal"><span class="stats__num">213</span><span class="stats__label">条读书笔记</span></li><li class="reveal"><span class="stats__num">6</span><span class="stats__label">常去的阅读地点</span></li>
+    </ul>
+  </section>
+
+  <section class="section" id="about" aria-labelledby="about-title">
+    <div class="section__head">
+      <p class="label">01 — 关于</p>
+      <h2 class="section__title" id="about-title">一个把阅读当作坐标的人</h2>
+    </div>
+    <div class="about">
+      <div class="about__text reveal">
+        <p>我是 milifo。白天做产品设计，晚上读书、写笔记，周末在城市里找一个能坐一下午的位置。</p><p>这个站点不追热点，只记录两件事：读了什么，以及在哪儿读的。书的内容会被忘掉，但读它的那个下午——光、声音、椅子硬不硬——往往记得很清楚。</p><p>如果某本书和某个地点恰好对上，那大概就是我记忆里最牢的部分。</p>
+      </div>
+      <aside class="now reveal" aria-label="现在">
+        <p class="label">现在 / NOW</p>
+        <dl class="now__list"><div><dt>在读</dt><dd>《城市与狗》</dd></div><div><dt>在写</dt><dd>一份「阅读地点」长清单</dd></div><div><dt>在听</dt><dd>坂本龍一</dd></div><div><dt>在找</dt><dd>下一个靠窗的座位</dd></div></dl>
+      </aside>
+    </div>
+  </section>
+
+  <section class="section" id="works" aria-labelledby="works-title">
+    <div class="section__head">
+      <p class="label">02 — 作品</p>
+      <h2 class="section__title" id="works-title">写下来的东西</h2>
+      <p class="section__note">原创作品与社区投稿分开摆放。点进去可以留言。</p>
+    </div>
+    <div class="writing" data-writing></div>
+    <p class="section__more"><a class="btn btn--ghost" href="works.html">看全部作品 →</a></p>
+  </section>
+
+  <section class="section" id="places" aria-labelledby="places-title">
+    <div class="section__head">
+      <p class="label">03 — 阅读地点</p>
+      <h2 class="section__title" id="places-title">书是在这些地方读完的</h2>
+      <p class="section__note">每个地点都是一本书的背景。</p>
+    </div>
+    <ol class="places">
+      <li class="place reveal" style="--h:24">
+        <div class="place__field" aria-hidden="true"><span class="place__coords">31.21°N 121.45°E</span></div>
+        <div class="place__body">
+          <p class="place__city">上海 · 南昌路</p>
+          <h3 class="place__name">深夜书店的二楼</h3>
+          <p class="place__note">靠窗第二张桌子，冬天有暖气。十一点以后整层只剩翻页的声音，一本三百页的小说刚好读完。</p>
+          <p class="place__meta"><span>2023 — 至今</span><span>已读 14 本</span></p>
+        </div>
+      </li>
+      <li class="place reveal" style="--h:340">
+        <div class="place__field" aria-hidden="true"><span class="place__coords">35.03°N 135.77°E</span></div>
+        <div class="place__body">
+          <p class="place__city">京都 · 出町柳</p>
+          <h3 class="place__name">鸭川边的长椅</h3>
+          <p class="place__note">四月，樱花落在书页上。读《枕草子》，风把纸压得哗哗响，只好用保温杯压住一角。</p>
+          <p class="place__meta"><span>2024 · 春</span><span>已读 2 本</span></p>
+        </div>
+      </li>
+      <li class="place reveal" style="--h:6">
+        <div class="place__field" aria-hidden="true"><span class="place__coords">25.70°N 100.16°E</span></div>
+        <div class="place__body">
+          <p class="place__city">大理 · 才村</p>
+          <h3 class="place__name">洱海边的露台</h3>
+          <p class="place__note">风大，书页要用手肘压着。下午四点水面开始发白，读到眼睛酸就抬头看一会儿山。</p>
+          <p class="place__meta"><span>2022 · 夏</span><span>已读 5 本</span></p>
+        </div>
+      </li>
+      <li class="place reveal" style="--h:200">
+        <div class="place__field" aria-hidden="true"><span class="place__coords">25.02°N 121.53°E</span></div>
+        <div class="place__body">
+          <p class="place__city">台北 · 温州街</p>
+          <h3 class="place__name">巷子里的咖啡店</h3>
+          <p class="place__note">下午三点有一道光刚好落在桌上。老板不赶人，续杯半价，适合读很厚的理论书。</p>
+          <p class="place__meta"><span>2019 — 2023</span><span>已读 9 本</span></p>
+        </div>
+      </li>
+      <li class="place reveal" style="--h:320">
+        <div class="place__field" aria-hidden="true"><span class="place__coords">38.71°N 9.14°W</span></div>
+        <div class="place__body">
+          <p class="place__city">里斯本 · Alfama</p>
+          <h3 class="place__name">电车经过的台阶</h3>
+          <p class="place__note">28 路经过时整条街都在震，读诗刚好——短，可以随时抬头。</p>
+          <p class="place__meta"><span>2025 · 秋</span><span>已读 3 本</span></p>
+        </div>
+      </li>
+      <li class="place reveal" style="--h:38">
+        <div class="place__field" aria-hidden="true"><span class="place__coords">31.22°N 121.44°E</span></div>
+        <div class="place__body">
+          <p class="place__city">家里 · 书桌</p>
+          <h3 class="place__name">凌晨一点的台灯</h3>
+          <p class="place__note">猫在脚边，台灯只照亮一页。读不进去的时候就把书扣在脸上睡十分钟。</p>
+          <p class="place__meta"><span>一年</span><span>已读 无法统计</span></p>
+        </div>
+      </li></ol>
+  </section>
+
+  <section class="section" id="sections" aria-labelledby="sections-title">
+    <div class="section__head">
+      <p class="label">04 — 分区</p>
+      <h2 class="section__title" id="sections-title">站内的其他分区</h2>
+      <p class="section__note">每个分区都可以指向站内页面，也可以是别处的链接。</p>
+    </div>
+    <ul class="sections">
+      <li>
+        <a href="works.html">
+          <span class="sections__label">博客</span>
+          <span class="sections__note">写下来的东西，按时间排</span>
+          <span class="sections__arrow" aria-hidden="true">↗</span>
+        </a>
+      </li><li>
+        <a href="works.html?kind=community">
+          <span class="sections__label">社区投稿</span>
+          <span class="sections__note">访客投的稿，审核后放出</span>
+          <span class="sections__arrow" aria-hidden="true">↗</span>
+        </a>
+      </li><li>
+        <a href="index.html#places">
+          <span class="sections__label">阅读地点</span>
+          <span class="sections__note">六张会发光的卡片</span>
+          <span class="sections__arrow" aria-hidden="true">↗</span>
+        </a>
+      </li><li>
+        <a href="index.html#about">
+          <span class="sections__label">关于我</span>
+          <span class="sections__note">一个把阅读当作坐标的人</span>
+          <span class="sections__arrow" aria-hidden="true">↗</span>
+        </a>
+      </li>
+    </ul>
+  </section>
+
+  <section class="section section--contact" id="contact" aria-labelledby="contact-title">
+    <div class="section__head">
+      <p class="label">05 — 联系</p>
+      <h2 class="section__title" id="contact-title">想聊聊书，或者交换一个座位</h2>
+    </div>
+    <div class="contact reveal">
+      <p class="contact__lead">邮件我会看，但不一定回得快。如果是推荐一本书，请直接告诉我它适合在哪儿读。</p>
+      <a class="contact__mail" href="mailto:hi@milifo.com">hi@milifo.com</a>
+      <ul class="contact__links">
+        <li><a href="https://github.com/Milifoxyt/web" target="_blank" rel="noopener">GitHub</a></li><li><a href="#">豆瓣</a></li><li><a href="works.html">全部作品</a></li>
+      </ul>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="footer__inner">
+    <p>© <span data-year>2026</span> milifo · 读书，写字，找一个靠窗的位置</p>
+    <p class="footer__meta">EdgeOne Pages · Functions + KV</p>
+  </div>
+</footer>
+
+<script src="assets/app.js" defer></script>
+<script src="assets/app-api.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>注册 · milifo</title>
+<meta name="description" content="注册一个账号">
+<meta name="theme-color" content="#0b0908">
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/blog.css">
+<script>document.documentElement.classList.add('js');</script>
+</head>
+<body data-page="auth">
+<a class="skip" href="#main">跳到正文</a>
+
+<header class="topbar" id="top">
+  <a class="brand" href="index.html">milifo<span aria-hidden="true">.</span></a>
+  <nav class="nav" aria-label="主导航">
+        <a href="works.html">作品</a>
+        <a href="index.html#about">关于</a>
+        <a href="index.html#places">阅读地点</a>
+        <a href="works.html?kind=community">社区投稿</a>
+        <a href="index.html#contact">联系</a>
+  </nav>
+  <div class="topbar__account">
+        <a class="topbar__link" href="login.html">登录</a>
+        <a class="topbar__cta" href="register.html">注册</a>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="section section--narrow">
+    <div class="section__head">
+      <p class="label">注册 / JOIN</p>
+      <h1 class="section__title">留个名字</h1>
+      <p class="section__note">注册之后可以留言，也可以投自己的稿子。投稿会先给我看。</p>
+    </div>
+    <form class="form" data-auth-form="register">
+      <label class="field"><span class="field__label">邮箱</span>
+        <input type="email" name="email" required autocomplete="email" placeholder="you@example.com"></label>
+      <label class="field"><span class="field__label">昵称</span>
+        <input type="text" name="name" maxlength="20" placeholder="留言时显示的名字"></label>
+      <label class="field"><span class="field__label">密码</span>
+        <input type="password" name="password" minlength="8" required autocomplete="new-password" placeholder="至少 8 位"></label>
+      <label class="field"><span class="field__label">再输一次</span>
+        <input type="password" name="password2" minlength="8" required autocomplete="new-password" placeholder="两次要一样"></label>
+      <span class="flash" data-flash hidden></span>
+      <div class="form__actions"><button class="btn" type="submit">注册</button></div>
+    </form>
+    <p class="form__alt">已经有账号？<a href="login.html">去登录</a></p>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="footer__inner">
+    <p>© <span data-year>2026</span> milifo · 读书，写字，找一个靠窗的位置</p>
+    <p class="footer__meta">EdgeOne Pages · Functions + Blob</p>
+  </div>
+</footer>
+
+<script src="assets/app.js" defer></script>
+<script src="assets/app-api.js" defer></script>
+</body>
+</html>
