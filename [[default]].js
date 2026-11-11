@@ -27,6 +27,12 @@ function json(obj, status = 200, extra = {}) {
 
 const bad = (msg, status = 400) => json({ ok: false, error: msg }, status);
 
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
+
 async function jget(kv, key, fallback = null) {
   const raw = await kv.get(key);
   if (raw === null || raw === undefined || raw === '') return fallback;
@@ -684,7 +690,7 @@ export async function onRequest(ctx) {
           try { await _rawStore.delete(probeKey); } catch (e) { /* 忽略 */ }
         }
 
-        return json({
+        const payload = {
           ok: true,
           store: _storeKind || 'none',
           storeName: _storeName || '',
@@ -693,7 +699,44 @@ export async function onRequest(ctx) {
           modes: { read: _blobReadMode, write: _blobSetMode },
           envKeys: envStoreKeys(env),
           user: publicUser(user)
-        });
+        };
+
+        // 浏览器直接打开时给一个人能读的页面（手机上截图就能发）
+        const accept = (request.headers.get('accept') || '');
+        if (accept.includes('text/html')) {
+          const line = (k, v, bad) =>
+            '<li><b>' + k + '</b><span style="color:' + (bad ? '#ff8a5c' : '#8fd694') + '">' +
+            escapeHtml(String(v)) + '</span></li>';
+          const html = '<!doctype html><html lang="zh-CN"><meta charset="utf-8">' +
+            '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+            '<title>存储自检</title>' +
+            '<style>body{background:#0b0908;color:#f2eae1;font:16px/1.7 system-ui,sans-serif;' +
+            'margin:0;padding:28px 20px}h1{font-size:22px;margin:0 0 4px}' +
+            '.n{color:#a4958a;font-size:13px;letter-spacing:.08em;margin-bottom:22px}' +
+            'ul{list-style:none;padding:0;margin:0}li{padding:11px 0;border-bottom:1px solid #2a2320;' +
+            'display:flex;gap:12px;justify-content:space-between}b{font-weight:500;color:#a4958a}' +
+            'span{font-family:ui-monospace,Consolas,monospace;font-size:13px;text-align:right;' +
+            'word-break:break-all}.e{margin-top:18px;font-family:ui-monospace,monospace;font-size:12px;' +
+            'color:#ff8a5c;word-break:break-all;white-space:pre-wrap}</style>' +
+            '<h1>存储自检</h1><div class="n">/api/health</div><ul>' +
+            line('store', payload.store, payload.store !== 'blob') +
+            line('storeName', payload.storeName, false) +
+            line('blob.ok', payload.blob.ok, !payload.blob.ok) +
+            line('selfTest.write', payload.selfTest.write, !payload.selfTest.write) +
+            line('selfTest.read', payload.selfTest.read, !payload.selfTest.read) +
+            line('modes.write', payload.modes.write, false) +
+            line('modes.read', payload.modes.read, false) +
+            line('envKeys', payload.envKeys.join(',') || '(空)', false) +
+            '</ul>' +
+            (payload.blob.error ? '<div class="e">blob: ' + escapeHtml(payload.blob.error) + '</div>' : '') +
+            (payload.selfTest.error ? '<div class="e">' + escapeHtml(payload.selfTest.error) + '</div>' : '') +
+            '</html>';
+          return new Response(html, {
+            headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' }
+          });
+        }
+
+        return json(payload);
       }
 
       default:
