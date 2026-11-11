@@ -1,6 +1,0 @@
-node_modules/
-.edge-kv.json
-.edge-blob/
-.env
-*.log
-.DS_Store
