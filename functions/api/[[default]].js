@@ -75,12 +75,17 @@ const looksUnsupported = (e) =>
 /**
  * 存 `algo$salt$hash`。不同运行时对 WebCrypto 的支持差别很大，
  * 有的 PBKDF2 迭代次数会被判 Param Invalid，所以逐档降级。
+ * 成功过一档就记住，后续不再重复试错。
  */
+let _pbkdf2Iter = 0;
+
 async function hashPassword(password) {
   const saltB64 = randomSaltB64();
-  for (const it of [120000, 10000]) {
+  const ladder = _pbkdf2Iter ? [_pbkdf2Iter] : [120000, 10000];
+  for (const it of ladder) {
     try {
       const hash = await pbkdf2(password, saltB64, it);
+      _pbkdf2Iter = it;
       return `pbkdf2-${it}$${saltB64}$${hash}`;
     } catch (e) {
       if (!looksUnsupported(e)) throw e;
