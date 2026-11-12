@@ -49,6 +49,8 @@ const rnd = (n) => {
 
 const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
 
+const randomSaltB64 = () => b64(crypto.getRandomValues(new Uint8Array(16)));
+
 async function pbkdf2(password, saltB64, iterations = 120000) {
   const salt = Uint8Array.from(atob(saltB64), (c) => c.charCodeAt(0));
   const key = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']);
@@ -58,17 +60,49 @@ async function pbkdf2(password, saltB64, iterations = 120000) {
   return b64(bits);
 }
 
+/** PBKDF2 不可用时的兜底：盐 + 密码做多轮 SHA-256 */
+async function sha256Iter(password, saltB64, rounds = 4000) {
+  let buf = enc.encode(saltB64 + '|' + password);
+  for (let i = 0; i < rounds; i++) {
+    buf = new Uint8Array(await crypto.subtle.digest('SHA-256', buf));
+  }
+  return b64(buf);
+}
+
+const looksUnsupported = (e) =>
+  /param|invalid|unsupported|not supported|not implemented|no such/i.test(String(e && e.message || e));
+
+/**
+ * 存 `algo$salt$hash`。不同运行时对 WebCrypto 的支持差别很大，
+ * 有的 PBKDF2 迭代次数会被判 Param Invalid，所以逐档降级。
+ */
 async function hashPassword(password) {
-  const salt = rnd(16);
-  const saltB64 = btoa(String.fromCharCode(...Uint8Array.from(salt.match(/../g).map((h) => parseInt(h, 16)))));
-  const hash = await pbkdf2(password, saltB64);
-  return `pbkdf2$${saltB64}$${hash}`;
+  const saltB64 = randomSaltB64();
+  for (const it of [120000, 10000]) {
+    try {
+      const hash = await pbkdf2(password, saltB64, it);
+      return `pbkdf2-${it}$${saltB64}$${hash}`;
+    } catch (e) {
+      if (!looksUnsupported(e)) throw e;
+    }
+  }
+  const hash = await sha256Iter(password, saltB64);
+  return `sha256x$${saltB64}$${hash}`;
 }
 
 async function checkPassword(password, stored) {
   const [algo, saltB64, hash] = String(stored).split('$');
-  if (algo !== 'pbkdf2' || !saltB64 || !hash) return false;
-  const test = await pbkdf2(password, saltB64);
+  if (!algo || !saltB64 || !hash) return false;
+
+  let test = null;
+  if (algo.startsWith('pbkdf2-')) {
+    test = await pbkdf2(password, saltB64, Number(algo.split('-')[1]) || 120000);
+  } else if (algo === 'sha256x') {
+    test = await sha256Iter(password, saltB64);
+  } else {
+    return false;
+  }
+
   if (test.length !== hash.length) return false;
   let diff = 0;
   for (let i = 0; i < test.length; i++) diff |= test.charCodeAt(i) ^ hash.charCodeAt(i);
@@ -177,7 +211,10 @@ async function ensureSeed(kv, env) {
     id: 1,
     email: email.toLowerCase(),
     name: (env && env.ADMIN_NAME) || 'milifo',
-    pass: await hashPassword(password),
+    pass: await (async () => {
+      try { return await hashPassword(password); }
+      catch (e) { throw new Error('生成密码哈希失败：' + (e && e.message || e)); }
+    })(),
     role: 'admin',
     createdAt: now
   };
@@ -465,13 +502,24 @@ async function healthReport(request, env) {
   payload.ok = payload.blob.ok && payload.selfTest.write && payload.selfTest.read && payload.selfTest.shaped;
   payload.modes = { read: _blobReadMode, write: _blobSetMode };
 
+  // 密码哈希也自检一次：不同运行时对 WebCrypto PBKDF2 的支持差别很大
+  const salt = randomSaltB64();
+  payload.crypto = {};
+  try { await pbkdf2('probe', salt, 120000); payload.crypto.pbkdf2_120k = 'ok'; }
+  catch (e) { payload.crypto.pbkdf2_120k = String(e && e.message || e); }
+  try { await pbkdf2('probe', salt, 10000); payload.crypto.pbkdf2_10k = 'ok'; }
+  catch (e) { payload.crypto.pbkdf2_10k = String(e && e.message || e); }
+  try { await sha256Iter('probe', salt, 10); payload.crypto.sha256 = 'ok'; }
+  catch (e) { payload.crypto.sha256 = String(e && e.message || e); }
+
   const accept = (request.headers.get('accept') || '');
   if (!accept.includes('text/html')) return json(payload);
+
+  const trunc = (s) => String(s).length > 42 ? String(s).slice(0, 40) + '…' : String(s);
 
   const line = (k, v, isBad) =>
     '<li><b>' + k + '</b><span style="color:' + (isBad ? '#ff8a5c' : '#8fd694') + '">' +
     escapeHtml(String(v)) + '</span></li>';
-
   const html = '<!doctype html><html lang="zh-CN"><meta charset="utf-8">' +
     '<meta name="viewport" content="width=device-width,initial-scale=1">' +
     '<title>存储自检</title>' +
@@ -494,6 +542,9 @@ async function healthReport(request, env) {
     line('modes.write', payload.modes.write, false) +
     line('modes.read', payload.modes.read, false) +
     line('envKeys', payload.envKeys.join(',') || '(空)', false) +
+    line('crypto.pbkdf2_120k', trunc(payload.crypto.pbkdf2_120k), payload.crypto.pbkdf2_120k !== 'ok') +
+    line('crypto.pbkdf2_10k', trunc(payload.crypto.pbkdf2_10k), payload.crypto.pbkdf2_10k !== 'ok') +
+    line('crypto.sha256', trunc(payload.crypto.sha256), payload.crypto.sha256 !== 'ok') +
     '</ul>' +
     (payload.blob.error ? '<div class="e">blob: ' + escapeHtml(payload.blob.error) + '</div>' : '') +
     (payload.selfTest.error ? '<div class="e">' + escapeHtml(payload.selfTest.error) + '</div>' : '') +
