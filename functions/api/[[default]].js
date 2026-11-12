@@ -232,6 +232,19 @@ async function blobSdk() {
 }
 
 /**
+ * 存储名必须是小写字母/数字/连字符（平台按对象存储的命名规则校验）。
+ * BLOG_BLOB、milifo_blog 这种带大写和下划线的名字会被判 Param Invalid，
+ * 而且读不存在的键不校验名字，只有写入时才报错 —— 这正是之前
+ * 「探测通过、首次写入 Param Invalid」的原因。
+ */
+const safeStoreName = (s) => String(s || '')
+  .toLowerCase()
+  .replace(/[_\s]+/g, '-')
+  .replace(/[^a-z0-9-]/g, '')
+  .replace(/-{2,}/g, '-')
+  .replace(/^-+|-+$/g, '');
+
+/**
  * 依次试候选名称，第一个能读通的才算数。
  * 名称顺序：环境变量指定 → 约定名。真实名称以控制台创建的存储名为准。
  */
@@ -240,10 +253,11 @@ async function probeBlob(env) {
   if (!mod) {
     return { ok: false, error: '没有装 @edgeone/pages-blob（构建时缺少依赖，请用 Git 仓库 + npm install）' };
   }
-  const names = [
-    env && env.BLOB_STORE, env && env.BLOB_STORE_NAME, env && env.BLOG_BLOB,
-    'BLOG_BLOB', 'milifo', 'milifo-blob', 'milifo_blog', 'blog'
-  ].filter(Boolean).map(String);
+  const raw = [
+    env && env.BLOB_STORE, env && env.BLOB_STORE_NAME, env && env.BLOG_BLOB
+  ];
+  const fallback = ['milifo-blog', 'blog', 'milifo'];
+  const names = [...raw, ...fallback].filter(Boolean).map(safeStoreName).filter(Boolean);
   const errs = [];
   for (const name of [...new Set(names)]) {
     let s = null;
@@ -382,8 +396,8 @@ async function resolveStore(env) {
 
   _storeErr = new Error(
     'Blob 存储不可用。' + r.error +
-    '。请确认：① 已安装依赖 @edgeone/pages-blob；② 已创建 Blob 存储；' +
-    '③ 存储名写进了环境变量 BLOB_STORE（没有就用约定的 BLOG_BLOB）。'
+    '。请确认：① 已安装依赖 @edgeone/pages-blob；② 存储名只用小写字母、数字、连字符' +
+    '（例如 milifo-blog，不要用 BLOG_BLOB 这种大写+下划线）；可用环境变量 BLOB_STORE 指定。'
   );
   throw _storeErr;
 }
@@ -396,11 +410,92 @@ async function blobStore(env) {
 
 /* ------------------------------ 路由 ------------------------------ */
 
+/**
+ * 自检页：不依赖任何别的路由，即使存储初始化失败也要能打开 —— 它本身就是用来
+ * 报告失败原因的，所以这里自己 probe、自己自测，绝不向外抛异常。
+ */
+async function healthReport(request, env) {
+  const payload = {
+    ok: false,
+    store: 'none',
+    storeName: '',
+    blob: { ok: false, name: '', error: '' },
+    selfTest: { write: false, read: false, error: '' },
+    modes: { read: _blobReadMode, write: _blobSetMode },
+    envKeys: envStoreKeys(env)
+  };
+
+  try {
+    const blob = await probeBlob(env);
+    payload.blob = { ok: blob.ok, name: blob.name || '', error: blob.ok ? '' : blob.error };
+    payload.storeName = blob.name || '';
+
+    if (blob.ok) {
+      payload.store = 'blob';
+      const probeKey = '__selftest__.txt';
+      try { await blobWrite(blob.raw, probeKey, 'ok'); payload.selfTest.write = true; }
+      catch (e) { payload.selfTest.error += 'write: ' + (e && e.message || e) + ' | '; }
+      try { payload.selfTest.read = (await blobRead(blob.raw, probeKey)) === 'ok'; }
+      catch (e) { payload.selfTest.error += 'read: ' + (e && e.message || e) + ' | '; }
+      try { await blob.raw.delete(probeKey); } catch (e) { /* 删不掉无所谓 */ }
+    }
+  } catch (e) {
+    payload.blob.error = String(e && e.message || e);
+  }
+
+  payload.ok = payload.blob.ok && payload.selfTest.write && payload.selfTest.read;
+  payload.modes = { read: _blobReadMode, write: _blobSetMode };
+
+  const accept = (request.headers.get('accept') || '');
+  if (!accept.includes('text/html')) return json(payload);
+
+  const line = (k, v, isBad) =>
+    '<li><b>' + k + '</b><span style="color:' + (isBad ? '#ff8a5c' : '#8fd694') + '">' +
+    escapeHtml(String(v)) + '</span></li>';
+
+  const html = '<!doctype html><html lang="zh-CN"><meta charset="utf-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<title>存储自检</title>' +
+    '<style>body{background:#0b0908;color:#f2eae1;font:16px/1.7 system-ui,sans-serif;' +
+    'margin:0;padding:28px 20px}h1{font-size:22px;margin:0 0 4px}' +
+    '.n{color:#a4958a;font-size:13px;letter-spacing:.08em;margin-bottom:22px}' +
+    'ul{list-style:none;padding:0;margin:0}li{padding:11px 0;border-bottom:1px solid #2a2320;' +
+    'display:flex;gap:12px;justify-content:space-between}b{font-weight:500;color:#a4958a}' +
+    'span{font-family:ui-monospace,Consolas,monospace;font-size:13px;text-align:right;' +
+    'word-break:break-all}.e{margin-top:18px;font-family:ui-monospace,monospace;font-size:12px;' +
+    'color:#ff8a5c;word-break:break-all;white-space:pre-wrap}</style>' +
+    '<h1>存储自检</h1><div class="n">/api/health</div><ul>' +
+    line('ok', payload.ok ? 'true' : 'false', !payload.ok) +
+    line('store', payload.store, payload.store !== 'blob') +
+    line('storeName', payload.storeName || '(没探到)', !payload.storeName) +
+    line('blob.ok', payload.blob.ok, !payload.blob.ok) +
+    line('selfTest.write', payload.selfTest.write, !payload.selfTest.write) +
+    line('selfTest.read', payload.selfTest.read, !payload.selfTest.read) +
+    line('modes.write', payload.modes.write, false) +
+    line('modes.read', payload.modes.read, false) +
+    line('envKeys', payload.envKeys.join(',') || '(空)', false) +
+    '</ul>' +
+    (payload.blob.error ? '<div class="e">blob: ' + escapeHtml(payload.blob.error) + '</div>' : '') +
+    (payload.selfTest.error ? '<div class="e">' + escapeHtml(payload.selfTest.error) + '</div>' : '') +
+    '</html>';
+
+  return new Response(html, {
+    status: 200,
+    headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' }
+  });
+}
+
 export async function onRequest(ctx) {
   const { request, env } = ctx;
   const url = new URL(request.url);
   const path = url.pathname.replace(/\/+$/, '');
   const method = request.method.toUpperCase();
+
+  // 自检页必须永远能打开：放在存储初始化之前
+  if (path === '/api/health') {
+    try { return await healthReport(request, env); }
+    catch (e) { return json({ ok: false, error: String(e && e.message || e) }, 500); }
+  }
 
   let kv;
   try {
@@ -675,69 +770,8 @@ export async function onRequest(ctx) {
         });
       }
 
-      case '/api/health': {
-        const blob = await probeBlob(env);
-        try { await resolveStore(env); } catch (e) { /* 报告用 */ }
-
-        // 自测：写一次、读一次、删一次，把真实报错带出来
-        const selfTest = { write: false, read: false, error: '' };
-        if (_rawStore) {
-          const probeKey = '__selftest__.txt';
-          try { await blobWrite(_rawStore, probeKey, 'ok'); selfTest.write = true; }
-          catch (e) { selfTest.error += 'write: ' + (e && e.message || e) + ' | '; }
-          try { selfTest.read = (await blobRead(_rawStore, probeKey)) === 'ok'; }
-          catch (e) { selfTest.error += 'read: ' + (e && e.message || e) + ' | '; }
-          try { await _rawStore.delete(probeKey); } catch (e) { /* 忽略 */ }
-        }
-
-        const payload = {
-          ok: true,
-          store: _storeKind || 'none',
-          storeName: _storeName || '',
-          blob: { ok: blob.ok, name: blob.name || '', error: blob.ok ? '' : blob.error },
-          selfTest,
-          modes: { read: _blobReadMode, write: _blobSetMode },
-          envKeys: envStoreKeys(env),
-          user: publicUser(user)
-        };
-
-        // 浏览器直接打开时给一个人能读的页面（手机上截图就能发）
-        const accept = (request.headers.get('accept') || '');
-        if (accept.includes('text/html')) {
-          const line = (k, v, bad) =>
-            '<li><b>' + k + '</b><span style="color:' + (bad ? '#ff8a5c' : '#8fd694') + '">' +
-            escapeHtml(String(v)) + '</span></li>';
-          const html = '<!doctype html><html lang="zh-CN"><meta charset="utf-8">' +
-            '<meta name="viewport" content="width=device-width,initial-scale=1">' +
-            '<title>存储自检</title>' +
-            '<style>body{background:#0b0908;color:#f2eae1;font:16px/1.7 system-ui,sans-serif;' +
-            'margin:0;padding:28px 20px}h1{font-size:22px;margin:0 0 4px}' +
-            '.n{color:#a4958a;font-size:13px;letter-spacing:.08em;margin-bottom:22px}' +
-            'ul{list-style:none;padding:0;margin:0}li{padding:11px 0;border-bottom:1px solid #2a2320;' +
-            'display:flex;gap:12px;justify-content:space-between}b{font-weight:500;color:#a4958a}' +
-            'span{font-family:ui-monospace,Consolas,monospace;font-size:13px;text-align:right;' +
-            'word-break:break-all}.e{margin-top:18px;font-family:ui-monospace,monospace;font-size:12px;' +
-            'color:#ff8a5c;word-break:break-all;white-space:pre-wrap}</style>' +
-            '<h1>存储自检</h1><div class="n">/api/health</div><ul>' +
-            line('store', payload.store, payload.store !== 'blob') +
-            line('storeName', payload.storeName, false) +
-            line('blob.ok', payload.blob.ok, !payload.blob.ok) +
-            line('selfTest.write', payload.selfTest.write, !payload.selfTest.write) +
-            line('selfTest.read', payload.selfTest.read, !payload.selfTest.read) +
-            line('modes.write', payload.modes.write, false) +
-            line('modes.read', payload.modes.read, false) +
-            line('envKeys', payload.envKeys.join(',') || '(空)', false) +
-            '</ul>' +
-            (payload.blob.error ? '<div class="e">blob: ' + escapeHtml(payload.blob.error) + '</div>' : '') +
-            (payload.selfTest.error ? '<div class="e">' + escapeHtml(payload.selfTest.error) + '</div>' : '') +
-            '</html>';
-          return new Response(html, {
-            headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' }
-          });
-        }
-
-        return json(payload);
-      }
+      case '/api/health':
+        return healthReport(request, env);
 
       default:
         return bad('没有这个接口：' + path, 404);
