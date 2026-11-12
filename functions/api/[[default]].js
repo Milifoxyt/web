@@ -167,6 +167,12 @@ async function ensureSeed(kv, env) {
   const password = (env && env.ADMIN_PASSWORD) || 'milifo-admin-2026';
   const now = Date.now();
 
+  // 写入失败时把「是哪个键」带出来，方便一眼定位
+  const put = async (key, val) => {
+    try { await jset(kv, key, val); }
+    catch (e) { throw new Error('写 ' + safeKey(key) + ' 失败：' + (e && e.message || e)); }
+  };
+
   const admin = {
     id: 1,
     email: email.toLowerCase(),
@@ -175,9 +181,9 @@ async function ensureSeed(kv, env) {
     role: 'admin',
     createdAt: now
   };
-  await jset(kv, `user:${admin.email}`, admin);
-  await jset(kv, 'users:index', [admin.email]);
-  await jset(kv, 'seq:user', 1);
+  await put(`user:${admin.email}`, admin);
+  await put('users:index', [admin.email]);
+  await put('seq:user', 1);
 
   const ids = [];
   let pid = 0;
@@ -196,12 +202,12 @@ async function ensureSeed(kv, env) {
       createdAt: now - pid * 3600e3,
       updatedAt: now - pid * 3600e3
     };
-    await jset(kv, `post:${pid}`, post);
+    await put(`post:${pid}`, post);
     ids.unshift(pid);
   }
-  await jset(kv, 'posts:index', ids);
-  await jset(kv, 'seq:post', pid);
-  await jset(kv, 'meta:seeded', { at: now });
+  await put('posts:index', ids);
+  await put('seq:post', pid);
+  await put('meta:seeded', { at: now });
 }
 
 /* ------------------------------ Blob（图片） ------------------------------ */
@@ -351,12 +357,14 @@ async function blobWrite(store, key, value) {
 
 /**
  * 键名规整：Blob 的对象键只保证 ASCII 安全，
- * 冒号、@ 这类字符会被 SDK 判成非法参数（Param Invalid），统一换掉。
+ * 冒号、@、~ 这类字符都可能被 SDK 判成非法参数（Param Invalid）。
+ * 这里只保留 字母 / 数字 / 点 / 下划线 / 连字符 / 斜杠，其余一律换掉。
  */
 const safeKey = (k) => String(k)
+  .replace(/@/g, '-at-')
   .replace(/:/g, '.')
-  .replace(/@/g, '~')
-  .replace(/[^A-Za-z0-9._\-/]/g, '_');
+  .replace(/[^A-Za-z0-9._\-/]/g, '-')
+  .replace(/-{2,}/g, '-');
 
 /**
  * 把 Blob 包成 get / put / delete 三个方法，
@@ -420,7 +428,7 @@ async function healthReport(request, env) {
     store: 'none',
     storeName: '',
     blob: { ok: false, name: '', error: '' },
-    selfTest: { write: false, read: false, error: '' },
+    selfTest: { write: false, read: false, shaped: false, error: '' },
     modes: { read: _blobReadMode, write: _blobSetMode },
     envKeys: envStoreKeys(env)
   };
@@ -438,12 +446,23 @@ async function healthReport(request, env) {
       try { payload.selfTest.read = (await blobRead(blob.raw, probeKey)) === 'ok'; }
       catch (e) { payload.selfTest.error += 'read: ' + (e && e.message || e) + ' | '; }
       try { await blob.raw.delete(probeKey); } catch (e) { /* 删不掉无所谓 */ }
+
+      // 再用一个和真实数据同形的键（带点、连字符、较长 JSON），验证不是键名格式的问题
+      const shaped = 'probe.user-at-example.com';
+      try {
+        await blobWrite(blob.raw, shaped, JSON.stringify({ id: 1, email: 'x@example.com', name: '测试' }));
+        payload.selfTest.shaped = true;
+      } catch (e) {
+        payload.selfTest.shaped = false;
+        payload.selfTest.error += 'shaped: ' + (e && e.message || e) + ' | ';
+      }
+      try { await blob.raw.delete(shaped); } catch (e) { /* 忽略 */ }
     }
   } catch (e) {
     payload.blob.error = String(e && e.message || e);
   }
 
-  payload.ok = payload.blob.ok && payload.selfTest.write && payload.selfTest.read;
+  payload.ok = payload.blob.ok && payload.selfTest.write && payload.selfTest.read && payload.selfTest.shaped;
   payload.modes = { read: _blobReadMode, write: _blobSetMode };
 
   const accept = (request.headers.get('accept') || '');
@@ -471,6 +490,7 @@ async function healthReport(request, env) {
     line('blob.ok', payload.blob.ok, !payload.blob.ok) +
     line('selfTest.write', payload.selfTest.write, !payload.selfTest.write) +
     line('selfTest.read', payload.selfTest.read, !payload.selfTest.read) +
+    line('selfTest.shaped', payload.selfTest.shaped, !payload.selfTest.shaped) +
     line('modes.write', payload.modes.write, false) +
     line('modes.read', payload.modes.read, false) +
     line('envKeys', payload.envKeys.join(',') || '(空)', false) +
